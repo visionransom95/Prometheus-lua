@@ -38,11 +38,10 @@ const initLua = `
 lauxlib.luaL_dostring(L, fengari.to_luastring(initLua));
 
 let filesProtected = 0;
-let activeVisitors = 0;
 const sseClients = new Set<express.Response>();
 
 function broadcastStats() {
-  const data = JSON.stringify({ filesProtected, activeVisitors: Math.max(0, activeVisitors) });
+  const data = JSON.stringify({ filesProtected });
   for (const client of sseClients) {
     client.write(`data: ${data}\n\n`);
   }
@@ -68,12 +67,10 @@ async function startServer() {
     res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders();
 
-    activeVisitors++;
     sseClients.add(res);
     broadcastStats();
 
     req.on("close", () => {
-      activeVisitors--;
       sseClients.delete(res);
       broadcastStats();
     });

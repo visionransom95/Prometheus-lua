@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Code2, Zap, Shield, Users, Loader2, CheckCircle2, Download } from 'lucide-react';
+import { Upload, Zap, Shield, Loader2, CheckCircle2, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import CodeMirror from '@uiw/react-codemirror';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
@@ -38,7 +38,7 @@ export default function App() {
   
   const [fileName, setFileName] = useState<string>('');
   const [obfuscatedCode, setObfuscatedCode] = useState<string>('');
-  const [stats, setStats] = useState({ filesProtected: 0, activeVisitors: 0 });
+  const [stats, setStats] = useState({ filesProtected: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatBytes = (bytes: number, decimals = 1) => {
@@ -169,7 +169,7 @@ export default function App() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+          className="grid grid-cols-1 sm:grid-cols-2 gap-4"
         >
           <div className="bg-[#111] border border-gray-800 rounded-2xl p-6 flex items-center gap-4">
             <div className="p-3 bg-teal-500/10 rounded-full">
@@ -178,19 +178,6 @@ export default function App() {
             <div>
               <p className="text-sm text-gray-400 font-medium">Files Protected</p>
               <p className="text-3xl font-semibold text-white tracking-tight">{stats.filesProtected}</p>
-            </div>
-          </div>
-
-          <div className="bg-[#111] border border-gray-800 rounded-2xl p-6 flex items-center gap-4">
-            <div className="p-3 bg-blue-500/10 rounded-full">
-              <Users className="w-6 h-6 text-blue-400" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-400 font-medium">Active Visitors</p>
-              <p className="text-3xl font-semibold text-white tracking-tight">
-                <span className="w-2 h-2 rounded-full bg-blue-500 inline-block mr-2 animate-pulse" />
-                {stats.activeVisitors}
-              </p>
             </div>
           </div>
 
