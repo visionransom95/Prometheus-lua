@@ -71,6 +71,12 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, preset })
       });
+
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Backend server is not reachable. This full-stack app requires a Node.js server. If you are on Vercel, it lacks the custom backend setup.");
+      }
+
       const data = await res.json();
       
       if (!res.ok || data.error) {
