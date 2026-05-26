@@ -1,0 +1,6 @@
+{
+  "name": "Prometheus lua",
+  "description": "An online portal for the Prometheus Lua obfuscator, supporting file uploads and preset selection.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
