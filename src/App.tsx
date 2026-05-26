@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Code2, Zap, Shield, Users, Loader2, CheckCircle2 } from 'lucide-react';
+import { Upload, Code2, Zap, Shield, Users, Loader2, CheckCircle2, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import CodeMirror from '@uiw/react-codemirror';
+import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 
 const PrometheusLogo = ({ className = "w-6 h-6", color = "#e6522c" }: { className?: string; color?: string }) => (
   <svg
@@ -34,6 +36,8 @@ export default function App() {
   const [error, setError] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   
+  const [fileName, setFileName] = useState<string>('');
+  const [obfuscatedCode, setObfuscatedCode] = useState<string>('');
   const [stats, setStats] = useState({ filesProtected: 0, activeVisitors: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -86,15 +90,9 @@ export default function App() {
         fileName: file.name
       });
 
-      // Auto-download
-      const blob = new Blob([data.output], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
       const originalName = file.name.replace(/\.lua$/i, '');
-      a.download = `${originalName}.obfuscated.lua`;
-      a.click();
-      URL.revokeObjectURL(url);
+      setObfuscatedCode(data.output);
+      setFileName(originalName);
 
       // Satisyfing success microinteraction checkmark
       setDownloadSuccess(true);
@@ -132,6 +130,17 @@ export default function App() {
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (file) processFile(file);
+  };
+
+  const handleDownload = () => {
+    if (!obfuscatedCode) return;
+    const blob = new Blob([obfuscatedCode], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${fileName}.obfuscated.lua`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -325,6 +334,49 @@ export default function App() {
           </AnimatePresence>
 
         </motion.div>
+
+        {/* Code Viewer Section */}
+        <AnimatePresence>
+          {obfuscatedCode && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ delay: 0.1 }}
+              className="bg-[#111] rounded-2xl border border-gray-800 flex flex-col overflow-hidden"
+            >
+              <div className="bg-[#0a0a0a] border-b border-gray-800 px-6 py-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-gray-200 font-medium">Obfuscated Output</h3>
+                  <p className="text-sm text-gray-500 mt-0.5">{fileName}.obfuscated.lua</p>
+                </div>
+                <button
+                  onClick={handleDownload}
+                  className="bg-teal-500 hover:bg-teal-400 text-gray-900 font-semibold py-2 px-5 rounded-lg flex items-center gap-2 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </button>
+              </div>
+              <div className="max-h-[500px] overflow-auto">
+                <CodeMirror
+                  value={obfuscatedCode}
+                  height="100%"
+                  theme={vscodeDark}
+                  extensions={[]}
+                  editable={false}
+                  basicSetup={{
+                    lineNumbers: true,
+                    highlightActiveLineGutter: false,
+                    highlightActiveLine: false,
+                    foldGutter: true
+                  }}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
       </div>
     </div>
   );
