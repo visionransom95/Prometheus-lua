@@ -116,7 +116,11 @@ function NumbersToExpressions:CreateNumberExpression(val, depth)
 			if val ~= math.floor(val) or val < 0 then
 				return Ast.NumberExpression(val)
 			end
-			local hexStr = string.format("0x%X", val)
+			local intVal = math.tointeger and math.tointeger(val) or (not math.tointeger and math.floor(val))
+			if not intVal then
+				return Ast.NumberExpression(val)
+			end
+			local hexStr = string.format("0x%X", intVal)
 			local result = ""
 			for i = 1, #hexStr do
 				local c = hexStr:sub(i, i)

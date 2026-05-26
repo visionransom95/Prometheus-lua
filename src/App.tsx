@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Code2, Zap, Shield, Users, Loader2 } from 'lucide-react';
+import { Upload, Code2, Zap, Shield, Users, Loader2, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 const PrometheusLogo = ({ className = "w-6 h-6", color = "#e6522c" }: { className?: string; color?: string }) => (
@@ -18,14 +18,33 @@ const PrometheusLogo = ({ className = "w-6 h-6", color = "#e6522c" }: { classNam
 
 const PRESETS = ['Minify', 'Weak', 'Medium', 'High', 'Strong', 'Insane'];
 
+interface SizeReductionStats {
+  originalBytes: number;
+  obfuscatedBytes: number;
+  percentageChange: number;
+  isReduction: boolean;
+  fileName: string;
+}
+
 export default function App() {
   const [preset, setPreset] = useState<string>('Medium');
   const [loading, setLoading] = useState<boolean>(false);
+  const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
+  const [sizeChange, setSizeChange] = useState<SizeReductionStats | null>(null);
   const [error, setError] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   
   const [stats, setStats] = useState({ filesProtected: 0, activeVisitors: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const formatBytes = (bytes: number, decimals = 1) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['B', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+  };
 
   useEffect(() => {
     const eventSource = new EventSource('/api/stats/stream');
@@ -39,6 +58,7 @@ export default function App() {
   const processFile = async (file: File) => {
     setLoading(true);
     setError('');
+    setDownloadSuccess(false);
     
     try {
       const code = await file.text();
@@ -53,6 +73,19 @@ export default function App() {
         throw new Error(data.error || 'Failed to obfuscate');
       }
       
+      // Calculate size difference
+      const originalBytes = code.length;
+      const obfuscatedBytes = data.output.length;
+      const percentageChange = ((obfuscatedBytes - originalBytes) / originalBytes) * 100;
+      
+      setSizeChange({
+        originalBytes,
+        obfuscatedBytes,
+        percentageChange,
+        isReduction: obfuscatedBytes < originalBytes,
+        fileName: file.name
+      });
+
       // Auto-download
       const blob = new Blob([data.output], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
@@ -62,6 +95,13 @@ export default function App() {
       a.download = `${originalName}.obfuscated.lua`;
       a.click();
       URL.revokeObjectURL(url);
+
+      // Satisyfing success microinteraction checkmark
+      setDownloadSuccess(true);
+      setTimeout(() => {
+        setDownloadSuccess(false);
+      }, 3500);
+
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -120,7 +160,7 @@ export default function App() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-2 gap-4"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-4"
         >
           <div className="bg-[#111] border border-gray-800 rounded-2xl p-6 flex items-center gap-4">
             <div className="p-3 bg-teal-500/10 rounded-full">
@@ -131,6 +171,7 @@ export default function App() {
               <p className="text-3xl font-semibold text-white tracking-tight">{stats.filesProtected}</p>
             </div>
           </div>
+
           <div className="bg-[#111] border border-gray-800 rounded-2xl p-6 flex items-center gap-4">
             <div className="p-3 bg-blue-500/10 rounded-full">
               <Users className="w-6 h-6 text-blue-400" />
@@ -141,6 +182,36 @@ export default function App() {
                 <span className="w-2 h-2 rounded-full bg-blue-500 inline-block mr-2 animate-pulse" />
                 {stats.activeVisitors}
               </p>
+            </div>
+          </div>
+
+          <div className="bg-[#111] border border-gray-800 rounded-2xl p-6 flex items-center gap-4">
+            <div className={`p-3 rounded-full ${
+              sizeChange 
+                ? sizeChange.isReduction 
+                  ? 'bg-emerald-500/10 text-emerald-400' 
+                  : 'bg-[#e6522c]/10 text-[#e6522c]' 
+                : 'bg-gray-850/40 text-gray-500'
+            }`}>
+              <Zap className="w-6 h-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-gray-400 font-medium truncate">Size Optimization</p>
+              {sizeChange ? (
+                <div>
+                  <p className={`text-2xl font-semibold tracking-tight ${sizeChange.isReduction ? 'text-emerald-400' : 'text-[#e6522c]'}`}>
+                    {sizeChange.isReduction ? '-' : '+'}{Math.abs(sizeChange.percentageChange).toFixed(1)}%
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5 truncate">
+                    {formatBytes(sizeChange.originalBytes)} → {formatBytes(sizeChange.obfuscatedBytes)}
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-2xl font-semibold text-gray-600 tracking-tight">--</p>
+                  <p className="text-xs text-gray-600 mt-0.5">No file processed</p>
+                </div>
+              )}
             </div>
           </div>
         </motion.div>
@@ -183,22 +254,61 @@ export default function App() {
               onChange={handleFileUpload} 
               disabled={loading}
             />
-            {loading ? (
-              <div className="flex flex-col items-center gap-4">
-                <Loader2 className="w-10 h-10 text-teal-500 animate-spin" />
-                <p className="text-gray-300 font-medium text-lg">Obfuscating file...</p>
-              </div>
-            ) : (
-              <>
-                <div className="p-4 bg-gray-800/50 rounded-2xl">
-                  <Upload className="w-8 h-8 text-gray-400" />
-                </div>
-                <div>
-                  <p className="text-gray-200 font-medium text-lg">Click to upload or drag & drop</p>
-                  <p className="text-gray-500 text-sm mt-1">Accepts .lua files</p>
-                </div>
-              </>
-            )}
+            <AnimatePresence mode="wait">
+              {loading ? (
+                <motion.div 
+                  key="loading"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex flex-col items-center gap-4"
+                >
+                  <Loader2 className="w-10 h-10 text-teal-500 animate-spin" />
+                  <p className="text-gray-300 font-medium text-lg">Obfuscating file...</p>
+                </motion.div>
+              ) : downloadSuccess ? (
+                <motion.div 
+                  key="success"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                  className="flex flex-col items-center gap-4"
+                >
+                  <div className="p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 text-emerald-400">
+                    <motion.div
+                      initial={{ scale: 0.5, rotate: -45 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ delay: 0.1, type: "spring" }}
+                    >
+                      <CheckCircle2 className="w-10 h-10" />
+                    </motion.div>
+                  </div>
+                  <div>
+                    <p className="text-emerald-400 font-medium text-lg">File Processed & Downloaded!</p>
+                    <p className="text-gray-500 text-sm mt-1">Check your downloads folder</p>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div 
+                  key="idle"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex flex-col items-center gap-4"
+                >
+                  <div className="p-4 bg-gray-800/50 rounded-2xl">
+                    <Upload className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <div>
+                    <p className="text-gray-200 font-medium text-lg">Click to upload or drag & drop</p>
+                    <p className="text-gray-500 text-sm mt-1">Accepts .lua files</p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </label>
 
           <AnimatePresence>

@@ -14,6 +14,10 @@ interop.luaopen_js(L);
 
 // We define DO_OBF universally available
 const initLua = `
+  math.log10 = math.log10 or function(x)
+    return math.log(x) / math.log(10)
+  end
+
   arg = {}
   -- Update path to find Prometheus
   package.path = "${path.resolve('./prometheus-source')}/?.lua;${path.resolve('./prometheus-source')}/?/init.lua;${path.resolve('./prometheus-source/src')}/?.lua;${path.resolve('./prometheus-source/src')}/?/init.lua;" .. package.path
@@ -38,11 +42,18 @@ let activeVisitors = 0;
 const sseClients = new Set<express.Response>();
 
 function broadcastStats() {
-  const data = JSON.stringify({ filesProtected, activeVisitors });
+  const data = JSON.stringify({ filesProtected, activeVisitors: Math.max(0, activeVisitors) });
   for (const client of sseClients) {
     client.write(`data: ${data}\n\n`);
   }
 }
+
+// Keep connections alive
+setInterval(() => {
+  for (const client of sseClients) {
+    client.write(': keepalive\n\n');
+  }
+}, 30000);
 
 async function startServer() {
   const app = express();
@@ -54,6 +65,7 @@ async function startServer() {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders();
 
     activeVisitors++;
