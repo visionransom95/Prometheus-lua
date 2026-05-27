@@ -33,10 +33,14 @@ const initLua = `
           preset = Prometheus.Presets.Medium
       end
       
-      -- Create a defensive copy or mutate directly to support LuaU syntax
-      preset.LuaVersion = "LuaU"
+      local customPreset = {}
+      for k, v in pairs(preset) do
+          customPreset[k] = v
+      end
+      -- Force LuaU
+      customPreset.LuaVersion = "LuaU"
       
-      local pipeline = Prometheus.Pipeline:fromConfig(preset)
+      local pipeline = Prometheus.Pipeline:fromConfig(customPreset)
       return pipeline:apply(src, "input.lua")
   end
 `;
@@ -108,6 +112,10 @@ async function startServer() {
           errorMsg = errorMsg.split("PROMETHEUS:")[1].trim();
         } else {
           errorMsg = errorMsg.replace(/^.*?:(?:\d+:)?\s*/, '');
+        }
+        
+        if (errorMsg.includes("unexpected token") || errorMsg.includes("Parsing Error")) {
+          errorMsg += " (Note: Prometheus only has basic LuaU support. If you are using Luau type annotations like 'type MyType =' or 'variable: string', you must remove them before obfuscating as the parser does not support them yet.)";
         }
         
         return res.status(400).json({ error: errorMsg });
