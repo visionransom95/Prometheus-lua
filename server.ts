@@ -96,6 +96,10 @@ async function startServer() {
         return res.status(400).json({ error: "No code provided" });
       }
 
+      console.log("---- USER CODE TO OBFUSCATE ----");
+      console.log(code);
+      console.log("--------------------------------");
+
       // We call the Lua function
       // Since it requires calling with strings from JS easily, we can use global vars or push
       lua.lua_getglobal(L, fengari.to_luastring("DO_OBF"));
@@ -134,7 +138,27 @@ async function startServer() {
     }
   });
 
-  // Vite middleware for development
+  const scriptsToTest = [
+    `if true then end end`,
+    `type X = { a: string }`,
+    `export type X = string`,
+    `local function type() end`,
+  ];
+  for (const script of scriptsToTest) {
+    lua.lua_getglobal(L, fengari.to_luastring("DO_OBF"));
+    lua.lua_pushstring(L, fengari.to_luastring(script));
+    lua.lua_pushstring(L, fengari.to_luastring("Medium"));
+    const pcallRes = lua.lua_pcall(L, 2, 1, 0);
+    if (pcallRes !== lua.LUA_OK) {
+      console.log("Error for script:", script);
+      console.log(to_jsstring(lua.lua_tostring(L, -1)));
+      lua.lua_pop(L, 1);
+    } else {
+      console.log("Success for script:", script);
+      lua.lua_pop(L, 1);
+    }
+  }
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
