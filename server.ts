@@ -13,6 +13,8 @@ lualib.luaL_openlibs(L);
 interop.luaopen_js(L);
 
 // We define DO_OBF universally available
+const promPath = path.resolve('./prometheus-source').replace(/\\/g, '/');
+
 const initLua = `
   math.log10 = math.log10 or function(x)
     return math.log(x) / math.log(10)
@@ -20,7 +22,7 @@ const initLua = `
 
   arg = {}
   -- Update path to find Prometheus
-  package.path = "${path.resolve('./prometheus-source')}/?.lua;${path.resolve('./prometheus-source')}/?/init.lua;${path.resolve('./prometheus-source/src')}/?.lua;${path.resolve('./prometheus-source/src')}/?/init.lua;" .. package.path
+  package.path = "${promPath}/?.lua;${promPath}/?/init.lua;${promPath}/src/?.lua;${promPath}/src/?/init.lua;" .. package.path
   
   local Prometheus = require("prometheus")
   Prometheus.colors.enabled = false
@@ -30,12 +32,19 @@ const initLua = `
       if not preset then
           preset = Prometheus.Presets.Medium
       end
+      
+      -- Create a defensive copy or mutate directly to support LuaU syntax
+      preset.LuaVersion = "LuaU"
+      
       local pipeline = Prometheus.Pipeline:fromConfig(preset)
       return pipeline:apply(src, "input.lua")
   end
 `;
 
-lauxlib.luaL_dostring(L, fengari.to_luastring(initLua));
+const res = lauxlib.luaL_dostring(L, fengari.to_luastring(initLua));
+if (res !== lua.LUA_OK) {
+  console.error("Failed to load initLua: " + to_jsstring(lua.lua_tostring(L, -1)));
+}
 
 let filesProtected = 0;
 const sseClients = new Set<express.Response>();
@@ -95,9 +104,11 @@ async function startServer() {
         lua.lua_pop(L, 1);
         
         // Remove internal Lua trace prefixes like "logger.lua:56: "
-        errorMsg = errorMsg.replace(/^.*?logger\.lua:\d+:\s*/, '');
-        errorMsg = errorMsg.replace(/^\[string ".*?"\]:\d+:\s*/, '');
-        errorMsg = errorMsg.replace(/^PROMETHEUS:\s*/, '');
+        if (errorMsg.includes("PROMETHEUS:")) {
+          errorMsg = errorMsg.split("PROMETHEUS:")[1].trim();
+        } else {
+          errorMsg = errorMsg.replace(/^.*?:(?:\d+:)?\s*/, '');
+        }
         
         return res.status(400).json({ error: errorMsg });
       }
